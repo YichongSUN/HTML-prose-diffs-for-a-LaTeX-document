@@ -1,26 +1,38 @@
-# scripts/
+# Thesis Utility Scripts
 
-Utility scripts for the LaTeX thesis project.
+> Precision tooling for LaTeX thesis revision workflows.
+> Designed by [Yichong SUN](https://github.com/ycsun) · 2026
 
 ---
 
-## `thesis_content_diff.py` — LaTeX Content Diff
+## Overview
 
-Generates a **self-contained HTML report** that shows chapter-by-chapter prose differences between two Git revisions of a LaTeX document. The script normalises raw LaTeX into readable text blocks before diffing, so the report focuses on *what you actually wrote* rather than markup noise.
+This directory contains utility scripts that augment a LaTeX thesis project with Git-aware diffing capabilities. Rather than wading through raw markup deltas, these tools surface the prose that matters — stripping away LaTeX noise and presenting changes in a clean, navigable HTML report.
 
-**Designed by Yichong SUN 2026**
+| Script | Role |
+|---|---|
+| [`thesis_content_diff.py`](#thesis_content_diffpy) | Core diff engine — produces a self-contained HTML report |
+| [`diff.sh`](#diffsh) | Convenience wrapper — one command, browser auto-opens on macOS |
 
-### What gets normalised away
+---
 
-| Suppressed | Kept |
+## `thesis_content_diff.py`
+
+A pure-stdlib Python script that compares two Git revisions of a LaTeX document chapter by chapter. It normalises raw `.tex` source into readable prose blocks before diffing, so the report reflects *what you actually wrote* — not how you wrote it.
+
+### Normalisation philosophy
+
+The diff engine deliberately suppresses markup that carries no semantic weight while preserving content that does.
+
+| Suppressed (noise) | Preserved (signal) |
 |---|---|
 | `% comments` | Prose sentences and paragraphs |
 | `\label`, `\ref`, `\autoref` | Section headings (`\chapter`, `\section`, …) |
-| Citation keys (`\cite`, `\citep`, `\citet`) | Inline math (simplified, e.g. `$x^2$` → `x^2`) |
-| Figure paths (`\includegraphics`) | Figure / table captions |
-| Display equations (`equation`, `align`, …) | List items (`\item`) |
-| `\begin`/`\end` of most environments | `\href` link text |
-| Line-wrap differences | `\SI` values with units |
+| Citation keys (`\cite`, `\citep`, `\citet`) | Inline math (e.g. `$x^2$` → `x^2`) |
+| Figure paths (`\includegraphics`) | Figure and table captions |
+| Display math environments (`equation`, `align`, …) | List items (`\item`) |
+| `\begin` / `\end` of most environments | Hyperlink text (`\href`) |
+| Line-wrap differences | Physical quantities (`\SI` values with units) |
 
 ### Requirements
 
@@ -28,27 +40,29 @@ Generates a **self-contained HTML report** that shows chapter-by-chapter prose d
 |---|---|
 | Python | ≥ 3.10 |
 | Git | any recent version |
-| [uv](https://github.com/astral-sh/uv) | ≥ 0.4 (recommended runner) |
+| [uv](https://github.com/astral-sh/uv) | ≥ 0.4 *(recommended runner)* |
 
-> The script uses only Python standard library — no `pip install` required.
+> **Zero dependencies.** The script relies exclusively on the Python standard library — no virtual environment or `pip install` required.
 
 ---
 
 ### Quick start
 
 ```zsh
-# Using the convenience wrapper (macOS: auto-opens report in browser)
+# One-liner via the convenience wrapper (auto-opens in browser on macOS)
 ./scripts/diff.sh HEAD~1 HEAD
 
-# Directly with uv
+# Or invoke the script directly with uv
 uv run scripts/thesis_content_diff.py HEAD~1 HEAD
 ```
 
-The report is saved to:
+The report is written to:
+
 ```
 diff_reports/thesis-content-diff_<old-sha>_to_<new-sha>.html
 ```
-and the path is printed to stdout.
+
+The resolved output path is echoed to stdout.
 
 ---
 
@@ -58,35 +72,35 @@ and the path is printed to stdout.
 uv run scripts/thesis_content_diff.py [options] <old_rev> <new_rev>
 ```
 
-| Argument | Default | Description |
+| Argument / Flag | Default | Description |
 |---|---|---|
-| `old_rev` | *(required)* | Older Git commit, tag, branch, or revision expression |
-| `new_rev` | *(required)* | Newer Git commit, tag, branch, or revision expression |
-| `-o`, `--output` | `diff_reports/thesis-content-diff_<old>_to_<new>.html` | Custom output path (relative paths are resolved from the repo root) |
-| `--thesis` | `thesis.tex` | Entry `.tex` file that contains `\include` directives, relative to the repo root |
-| `--context` | `2` | Number of unchanged text blocks to show around each change (like `diff -U`) |
-| `--only-changed` | off | Omit chapters where no prose changes were detected |
-| `--chapter-prefix` | `chapters/` | Filter `\include` paths by this prefix. Pass `""` to collect all `\include`'d files |
-| `--title` | `LaTeX Content Diff` | Report title shown in the browser tab and sidebar |
+| `old_rev` | *(required)* | Older Git revision — commit hash, tag, branch, or expression |
+| `new_rev` | *(required)* | Newer Git revision — commit hash, tag, branch, or expression |
+| `-o`, `--output` | `diff_reports/thesis-content-diff_<old>_to_<new>.html` | Output path; relative paths are resolved from the repository root |
+| `--thesis` | `thesis.tex` | Entry `.tex` file containing `\include` directives, relative to repo root |
+| `--context` | `2` | Unchanged blocks shown around each change (analogous to `diff -U`) |
+| `--only-changed` | off | Suppress chapters with no detected prose changes |
+| `--chapter-prefix` | `chapters/` | Include only `\include`'d paths matching this prefix; pass `""` to collect all |
+| `--title` | `LaTeX Content Diff` | Report title displayed in the browser tab and sidebar |
 
 #### Examples
 
 ```zsh
-# Compare the last commit
+# Review the most recent commit
 uv run scripts/thesis_content_diff.py HEAD~1 HEAD
 
-# Compare a feature branch to main
+# Diff a feature branch against main
 uv run scripts/thesis_content_diff.py main feature/chp5-rewrite
 
-# Show only chapters that actually changed, with 4 context blocks
+# Focus on changed chapters only, with wider context
 uv run scripts/thesis_content_diff.py HEAD~5 HEAD --only-changed --context 4
 
-# Custom title and output path
+# Named report for a formal revision round
 uv run scripts/thesis_content_diff.py v1.0 HEAD \
   --title "Revision 1 → 2 Diff" \
   -o review/revision-diff.html
 
-# Use with a non-thesis LaTeX project (different entry file and chapter directory)
+# Adapt to a non-thesis LaTeX project
 uv run scripts/thesis_content_diff.py HEAD~1 HEAD \
   --thesis main.tex \
   --chapter-prefix sections/ \
@@ -95,9 +109,14 @@ uv run scripts/thesis_content_diff.py HEAD~1 HEAD \
 
 ---
 
-### `diff.sh` — convenience wrapper
+## `diff.sh`
 
-A thin Zsh wrapper around `thesis_content_diff.py`. On macOS it automatically opens the generated HTML in your default browser.
+A minimal Zsh wrapper around `thesis_content_diff.py` that forwards all arguments verbatim and, on macOS, automatically opens the resulting report in your default browser.
+
+```zsh
+# Accepts the same arguments as thesis_content_diff.py
+./scripts/diff.sh HEAD~1 HEAD --only-changed --context 4
+```
 
 ```zsh
 ./scripts/diff.sh <old_rev> <new_rev> [options]
